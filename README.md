@@ -13,6 +13,7 @@
 This repository contains the source code of "Heuristics and Metaheuristics" course (DCC831). All of the following algorithms have been implemented to solve the [Traveling Salesman Problem (TSP)](https://en.wikipedia.org/wiki/Travelling_salesman_problem):
 
 - Greedy Algorithm
+- Variable Neighborhood Descent (VND)
 
 All instances were taken from the [TSPLIB library](http://elib.zib.de/pub/mp-testdata/tsp/tsplib/tsp/).
 
