@@ -88,7 +88,7 @@ class VariableNeighborhoodDescent():
         self.path = list()
         self.costs = list()
         self.total_cost = None
-        self.niter = 2e5
+        self.niter = 200000
 
     def initialization(self, distance_matrix, mode, cycle = True):
 
@@ -211,6 +211,146 @@ class VariableNeighborhoodDescent():
             else:
                 k += 1
 
+class IteratedLocalSearch():
+
+    """ Iterated Local Search to solve the Travelling Salesman Problem (TSP). """
+
+    def __init__(self):
+
+        """
+            path: Point indexes in the order they are visited
+            costs: Costs of all trips between two consecutive points along the path
+            total_cost: Total cost of path found (sum of all costs)
+            liter: Number of iterations of the local search
+            giter: Number of iterations of the ILS
+        """
+
+        self.path = list()
+        self.costs = list()
+        self.total_cost = None
+
+    def initialization(self, distance_matrix, mode, cycle = True):
+
+        """
+            Creates an initial route.
+
+            distance_matrix: Square and symmetric matrix containing the distances, taken pairwise, between the points
+            mode: Strategy to create the initial solution (random or greedy)
+            cycle: True if the traveling salesman must return to the starting point
+        """
+
+        if mode == 'random':
+            
+            n = distance_matrix.shape[0]
+            path = np.random.choice(np.arange(1, n + 1), size = n, replace = False)
+
+            if cycle is True:
+                path = np.append(path, path[0])
+
+        elif mode == 'greedy':
+
+            GA = GreedyAlgorithm()
+            GA.optimize(distance_matrix, cycle, verbose = False)
+            path = GA.path
+
+        return path
+
+    def swap(self, path):
+
+        """
+            Swaps the position of two points on the route.
+
+            path: Point indexes in the order they are visited
+        """
+
+        n = len(path)
+        path_ = path.copy()
+
+        i = np.random.randint(1, n-1)
+        j = np.random.randint(1, n-1)
+    
+        path[i] = path_[j]
+        path[j] = path_[i]
+
+        return path
+
+    def two_opt(self, path):
+
+        """
+            2-opt movement take two arcs from the route and reconnect these arcs with each other.
+
+            path: Point indexes in the order they are visited
+        """
+
+        n = len(path)
+        idx = np.random.randint(1, n-1, size = 2)
+        i, j = sorted(idx)
+    
+        head = path[0:i]
+        neck = path[j:-n+i-1:-1]
+        tail = path[j+1:n]
+
+        path = np.concatenate((head, neck, tail))
+
+        return path
+    
+    def local_search(self, path, total_cost, liter, distance_matrix):
+
+        """
+            Local search starts from an initial solution and evolves that single solution into a mostly better and better solution through neighborhood structures.
+
+            path: Point indexes in the order they are visited
+            total_cost: Total cost of path found (sum of all costs) 
+            distance_matrix: Square and symmetric matrix containing the distances, taken pairwise, between the points
+        """
+
+        i = 0
+        while i < liter:
+        
+            path_ = self.two_opt(path)
+            total_cost_ = evaluate_path(path_, distance_matrix)
+
+            if(total_cost_ < total_cost):
+                path = path_
+                total_cost = total_cost_
+
+            i += 1
+
+        return path, total_cost
+
+    def perturbation(self, path, level):
+
+        for i in range(level):
+            path = self.swap(path)
+        
+        return path
+
+    def optimize(self, distance_matrix, giter = 100, liter = 20000, mode = 'random', cycle = True):
+
+        level = 1
+        self.path = self.initialization(distance_matrix, mode, cycle)
+        self.total_cost = evaluate_path(self.path, distance_matrix)
+
+        self.path, self.total_cost = self.local_search(self.path, self.total_cost, liter, distance_matrix)
+
+        pbar = tqdm(total = giter, desc = 'Iterations')
+
+        for i in range(giter):
+            
+            path = self.perturbation(self.path, level)
+            total_cost = evaluate_path(path, distance_matrix)
+            path, total_cost = self.local_search(path, total_cost, liter, distance_matrix)
+
+            if(total_cost < self.total_cost):
+                self.total_cost = total_cost
+                self.path = path
+                level = 1
+            else:
+                level += 1
+
+            pbar.update(1)
+
+        pbar.close()
 
 if __name__ == '__main__':
 
@@ -218,7 +358,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--instance', type = str, default = './tsp_instances/instances/lin105.tsp', help = 'instance path')
     parser.add_argument('--cycle', action = 'store_true', help = 'True if the trip must start and end at the same point')
-    parser.add_argument('--heuristic', type = str, default = 'VND', help = 'Heuristic name (can be Greedy or VND)')
+    parser.add_argument('--heuristic', type = str, default = 'VND', help = 'Heuristic name (can be Greedy, VND, or ILS)')
     args = parser.parse_args()
     print(args)
 
@@ -227,6 +367,8 @@ if __name__ == '__main__':
     distance_matrix = compute_weights(data)
 
     if args.heuristic.upper() == 'VND':
+
+        print('Solving Traveling Salesman Problem using Variable Neighborhood Descent')
 
         VND = VariableNeighborhoodDescent()
         VND.optimize(distance_matrix, 'random', 1, args.cycle)
@@ -237,12 +379,25 @@ if __name__ == '__main__':
 
     elif args.heuristic.upper() == 'GREEDY':
 
+        print('Solving Traveling Salesman Problem using Greedy Algorithm')
+
         GA = GreedyAlgorithm()
         GA.optimize(distance_matrix, args.cycle)
 
         print('Is the path feasible?', check_feasibility(GA.path, args.cycle))
         print('Path:', GA.path)
         print('Total cost:', GA.total_cost)
+
+    elif args.heuristic.upper() == 'ILS':
+
+        print('Solving Traveling Salesman Problem using Iterated Local Search')
+
+        ILS = IteratedLocalSearch()
+        ILS.optimize(distance_matrix, giter = 100, liter = 10000, mode = 'random', cycle = args.cycle)
+
+        print('Is the path feasible?', check_feasibility(ILS.path, args.cycle))
+        print('Path:', ILS.path)
+        print('Total cost:', ILS.total_cost)
     
     else:
         raise AssertionError('This heuristic has not been implemented yet.')
