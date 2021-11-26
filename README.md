@@ -14,6 +14,7 @@ This repository contains the source code of "Heuristics and Metaheuristics" cour
 
 - Greedy Algorithm
 - Variable Neighborhood Descent (VND)
+- Iterated Local Search (ILS)
 
 All instances were taken from the [TSPLIB library](http://elib.zib.de/pub/mp-testdata/tsp/tsplib/tsp/).
 
